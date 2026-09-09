@@ -99,6 +99,7 @@ switch:
     pin: GPIO4
     id: relay
     restore_mode: RESTORE_DEFAULT_OFF
+  # restore_mode: Always_on # if you want to keep your device on while reboot and connection loss 
 
 # The Confirmed Casing Manual Toggle Switch
 binary_sensor:
