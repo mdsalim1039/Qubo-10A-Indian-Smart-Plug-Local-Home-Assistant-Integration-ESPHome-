@@ -1,0 +1,1 @@
+# Qubo-10A-Indian-Smart-Plug-Local-Home-Assistant-Integration-ESPHome-
