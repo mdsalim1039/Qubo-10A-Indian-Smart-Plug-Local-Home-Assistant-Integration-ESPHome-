@@ -60,23 +60,28 @@ Through exhaustive multimeter continuity and real-world high-load frequency anal
 Below is the complete, factory-calibrated configuration file ready to deploy. It strips out system logging overhead to protect timing loops and uses custom multipliers scaled directly against a benchmark **2400W Remington D5220 High-Heat Turbo hairdryer** profile to pull dead-accurate voltage (~230V) and amperage.
 
 ```yaml
+# Board silk-screen reference: PTTY_OEM_003_01
+# Central Microcontroller Module: Espressif ESP32-C3
+# Power Metering IC Chip Profile: Shanghai Belling BL0937
+
 substitutions:
   device_name: qubo-smart-plug
   friendly_name: "Qubo Smart Plug"
 
 esphome:
-  name: \${device_name}
-  friendly_name: \${friendly_name}
+  name: ${device_name}
+  friendly_name: ${friendly_name}
 
 esp32:
   board: esp32-c3-devkitm-1
   framework:
-    type: arduino             # Stable, lightweight framework essential for hardware timer accuracy
+    type: arduino             # Crucial for stable hardware interrupt timing logic
 
 logger:
-  level: INFO                 # Throttles debug text output logs to secure data pulse streams
+  level: INFO                 # Minimizes logging overhead to protect high-frequency pulse counting loops
 
 api:
+  # It is recommended to generate a unique encryption key when deploying to production
   encryption:
     key: "YOUR_NATIVE_API_ENCRYPTION_KEY_HERE"
 
@@ -88,20 +93,24 @@ wifi:
   password: "YOUR_WIFI_PASSWORD"
   
   ap:
-    ssid: "\${friendly_name} Fallback Hotspot"
+    ssid: "${friendly_name} Fallback Hotspot"
 
 captive_portal:
 
-# The Confirmed Hardware Relay
+# Home Assistant Time Engine (Required by the Total Daily Energy totalizer sensor below)
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+
+# Confirmed Hardware Control Relay Pin Path
 switch:
   - platform: gpio
     name: "Power Relay"
     pin: GPIO4
     id: relay
     restore_mode: RESTORE_DEFAULT_OFF
-  # restore_mode: Always_on # if you want to keep your device on while reboot and connection loss 
 
-# The Confirmed Casing Manual Toggle Switch
+# Confirmed Casing Manual Override Push Button Pin Path
 binary_sensor:
   - platform: gpio
     pin:
@@ -112,7 +121,7 @@ binary_sensor:
     on_press:
       - switch.toggle: relay
 
-# The Confirmed Status LED
+# Confirmed Internal Low-Active Casing Status LED Pin Path
 status_led:
   pin:
     number: GPIO6
@@ -124,11 +133,11 @@ sensor:
     model: BL0937
     sel_pin: 
       number: GPIO5
-      inverted: true          # Inverts state logic to cleanly toggle between Volts and Amps
-    cf1_pin: GPIO3           # Confirmed Pin 7 (CF1) -> Tracks Volts/Amps Stream
-    cf_pin: GPIO7            # Confirmed Pin 6 (CF) -> Tracks active load Wattage trace
+      inverted: true          # Inverts state logic to cleanly toggle between Volts and Amps channels
+    cf1_pin: GPIO3           # Confirmed Pin 7 (CF1) -> Continuous High-Frequency Volts/Amps Stream
+    cf_pin: GPIO7            # Confirmed Pin 6 (CF) -> Load-Reactive Power (Watts) Stream
     
-    # Custom Calibrated Reference Multipliers matching the specific Qubo board shunts
+    # Custom Calibrated Reference Multipliers matching the specific PTTY_OEM_003_01 board shunts
     voltage_divider: 16038.0  
     current_resistor: 0.001   
     
@@ -137,31 +146,34 @@ sensor:
       unit_of_measurement: "V"
       accuracy_decimals: 1
       filters:
-        - multiply: 0.1       # Corrects your raw core calculation baseline to clean 230V mains
+        - multiply: 0.1       # Corrects your raw core calculation baseline to a clean ~230V mains
         
     current:
       name: "Current"
       unit_of_measurement: "A"
       accuracy_decimals: 3
       filters:
-        - multiply: 0.711     # Calibrates amperage data limits directly under load parameters
+        - multiply: 0.711     # Calibrates amperage data limits directly under real load constraints
         
     power:
       name: "Power"
       unit_of_measurement: "W"
       accuracy_decimals: 1
+      id: live_power          # Exposed link ID for total daily tracking utility
       filters:
-        - multiply: 0.0844    # Calibrates pulse counting data directly to true load limits
+        - multiply: 0.0844    # Calibrates active pulse frequency directly to true load limits
         
     change_mode_every: 8s
     update_interval: 5s
 
   # Optional Total Energy Totalizer for native Home Assistant Energy Dashboard Integration
-  - platform: total_daily_energy:
+  - platform: total_daily_energy
     name: "Total Daily Energy"
+    power_id: live_power
     unit_of_measurement: "kWh"
     accuracy_decimals: 3
     restore: true
+
 ```
 
 ---
